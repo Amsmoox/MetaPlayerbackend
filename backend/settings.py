@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,7 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-_(ki17ik-cd%mfm1f-$71!pe2$qobn6+)@ew%vte)dlrx1omgd'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 # Allowed hosts for development
 # Android Emulator: 10.0.2.2
@@ -36,6 +37,8 @@ ALLOWED_HOSTS = [
     '192.168.11.101',  # Your local network IP
     '0.0.0.0',  # Allow binding to all interfaces
     '38.242.149.21',
+    'backend',  # Docker service name
+    'nginx',  # Docker service name
 ]
 
 
@@ -67,6 +70,8 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',  # Vite dev server
     'http://127.0.0.1:5173',  # Vite dev server (alternative)
+    'http://localhost',  # Docker nginx
+    'http://127.0.0.1',  # Docker nginx
     'http://38.242.149.21',  # Production endpoint
     'https://38.242.149.21',  # Production endpoint (HTTPS)
 ]
@@ -81,10 +86,13 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'http://localhost:5173',  # Frontend dev server
     'http://127.0.0.1:5173',  # Frontend dev server (alternative)
+    'http://localhost',  # Docker nginx
+    'http://127.0.0.1',  # Docker nginx
     'http://10.0.2.2:8000',  # Android emulator
     'http://192.168.11.101:8000',  # Your local network IP
     'http://38.242.149.21:8000',  # Your local network IP
     "http://38.242.149.21",
+    "https://38.242.149.21",
 ]
 
 # CSRF cookie settings (for API compatibility)
@@ -115,14 +123,16 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+# Docker: uses 'db' as host, local: uses 'localhost'
+DATABASE_HOST = os.getenv('DATABASE_HOST', 'localhost')
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'metaplayer_db',
         'USER': 'postgres',
-        'PASSWORD': '',
-        'HOST': 'localhost',
+        'PASSWORD': 'postgres',
+        'HOST': DATABASE_HOST,
         'PORT': '5432',
         'OPTIONS': {
             'connect_timeout': 10,
@@ -165,7 +175,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
