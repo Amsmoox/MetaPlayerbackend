@@ -13,7 +13,6 @@ from datetime import timedelta
 import json
 
 from .models import Device
-from .services import M3UService
 
 logger = logging.getLogger(__name__)
 
@@ -66,15 +65,7 @@ class DeviceRegisterView(View):
                     device.expires_at = device.created_at + timedelta(days=7)
                 device.save()
             
-            # Pre-fetch and cache M3U if URL is provided and new or changed
-            if m3u_url and (created or (device.m3u_url != m3u_url)):
-                try:
-                    # Fetch and cache M3U content (app will parse it locally)
-                    M3UService.get_m3u_for_device(device, force_refresh=True)
-                    logger.info(f"M3U cached for device {device.mac_address}")
-                except Exception as e:
-                    logger.error(f"Error caching M3U for device {device.mac_address}: {str(e)}")
-                    # Don't fail registration if caching fails
+            # No need to pre-fetch - app will fetch directly from IPTV service
             
             return JsonResponse({
                 'success': True,
@@ -139,33 +130,16 @@ class PlaylistView(View):
                     status=404
                 )
             
-            # Check if force refresh is requested
-            force_refresh = request.GET.get('refresh', '').lower() == 'true'
-            
-            # Get M3U content
-            m3u_content = M3UService.get_m3u_for_device(device, force_refresh=force_refresh)
-            
-            if m3u_content is None:
-                return JsonResponse(
-                    {'error': 'Failed to fetch M3U playlist'},
-                    status=500
-                )
-            
             # Update last_seen
             device.last_seen = timezone.now()
             device.save(update_fields=['last_seen'])
             
-            # Return M3U file
-            response = HttpResponse(m3u_content, content_type='application/vnd.apple.mpegurl')
-            response['Content-Disposition'] = f'inline; filename="playlist_{mac_address}.m3u"'
-            
-            # Add cache headers
-            if device.m3u_cache_updated:
-                response['Last-Modified'] = device.m3u_cache_updated.strftime('%a, %d %b %Y %H:%M:%S GMT')
-            if device.m3u_etag:
-                response['ETag'] = device.m3u_etag
-            
-            return response
+            # Simply return the IPTV URL - let the app fetch it directly
+            return JsonResponse({
+                'm3u_url': device.m3u_url,
+                'mac_address': device.mac_address,
+                'device_name': device.device_name
+            })
             
         except Exception as e:
             logger.error(f"Error getting playlist: {str(e)}")
@@ -193,7 +167,6 @@ class DeviceInfoView(View):
             
             # Check activation status - expired devices can still see info but with warning
             is_active = device.check_activation_status()
-            cache_info = M3UService.get_cache_info(device)
             activation_status = device.get_activation_status()
             
             response_data = {
@@ -203,7 +176,6 @@ class DeviceInfoView(View):
                 'is_active': is_active,
                 'created_at': device.created_at.isoformat(),
                 'last_seen': device.last_seen.isoformat(),
-                'cache': cache_info,
                 'activation_status': activation_status,
             }
             
@@ -262,21 +234,12 @@ def refresh_playlist(request, mac_address):
                 status=404
             )
         
-        # Force refresh M3U cache
-        m3u_content = M3UService.get_m3u_for_device(device, force_refresh=True)
-        
-        if m3u_content is None:
-            return JsonResponse(
-                {'error': 'Failed to refresh M3U playlist'},
-                status=500
-            )
-        
-        cache_info = M3UService.get_cache_info(device)
-        
+        # No caching - just return the URL
         return JsonResponse({
             'success': True,
-            'message': 'Playlist refreshed successfully',
-            'cache': cache_info,
+            'message': 'Playlist URL retrieved',
+            'm3u_url': device.m3u_url,
+            'mac_address': device.mac_address,
         })
         
     except Exception as e:

@@ -5,8 +5,9 @@ App parses M3U locally - no channel storage in database.
 """
 import gzip
 import logging
+import socket
 from datetime import timedelta
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 from django.utils import timezone
@@ -19,7 +20,7 @@ class M3UService:
     """Service for handling M3U playlist operations."""
     
     @staticmethod
-    def fetch_m3u(url: str, timeout: int = 30) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    def fetch_m3u(url: str, timeout: int = 10) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """
         Fetch M3U file from URL.
         
@@ -62,6 +63,9 @@ class M3UService:
                 return None, None, None
             logger.error(f"HTTP error fetching M3U: {e.code} - {url}")
             return None, None, None
+        except socket.timeout:
+            logger.error(f"Timeout fetching M3U (exceeded {timeout}s): {url}")
+            return None, None, None
         except URLError as e:
             logger.error(f"URL error fetching M3U: {e.reason} - {url}")
             return None, None, None
@@ -70,7 +74,7 @@ class M3UService:
             return None, None, None
     
     @staticmethod
-    def get_m3u_for_device(device: Device, force_refresh: bool = False) -> Optional[str]:
+    def get_m3u_for_device(device: Device, force_refresh: bool = False) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
         """
         Get M3U content for a device, using cache if available and valid.
         
@@ -79,12 +83,13 @@ class M3UService:
             force_refresh: If True, force refresh even if cache is valid
             
         Returns:
-            M3U content as string, or None on error
+            Tuple of (M3U content, error_info)
+            Returns (content, None) on success, (None, error_info) on error
         """
         # Check cache first (unless forced refresh)
         if not force_refresh and device.is_cache_valid() and device.m3u_cache:
             logger.info(f"Using cached M3U for device {device.mac_address}")
-            return device.m3u_cache
+            return device.m3u_cache, None
         
         # Fetch fresh M3U
         logger.info(f"Fetching fresh M3U for device {device.mac_address}")
@@ -94,8 +99,16 @@ class M3UService:
             # If fetch failed, try to use stale cache
             if device.m3u_cache:
                 logger.warning(f"Fetch failed, using stale cache for device {device.mac_address}")
-                return device.m3u_cache
-            return None
+                return device.m3u_cache, None
+            
+            # No cache available - return error info
+            error_info = {
+                'type': 'fetch_failed',
+                'message': 'Failed to fetch M3U playlist from IPTV service and no cached data available.',
+                'has_cache': False,
+                'suggestion': 'Please check your IPTV service credentials and try again later.'
+            }
+            return None, error_info
         
         # Update cache
         device.m3u_cache = content
@@ -112,7 +125,7 @@ class M3UService:
         ])
         
         logger.info(f"M3U cache updated for device {device.mac_address}")
-        return content
+        return content, None
     
     @staticmethod
     def compress_m3u(content: str) -> bytes:

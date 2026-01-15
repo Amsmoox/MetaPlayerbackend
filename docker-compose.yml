@@ -26,7 +26,7 @@ services:
     command: >
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --noinput &&
-             gunicorn --bind 0.0.0.0:8000 --workers 3 backend.wsgi:application"
+             gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 300 --access-logfile - --error-logfile - --log-level info --access-logformat '%(h)s %(l)s %(u)s %(t)s \"%(r)s\" %(s)s %(b)s \"%(f)s\" \"%(a)s\" %(D)s' backend.wsgi:application"
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
@@ -55,6 +55,8 @@ services:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - static_volume:/app/staticfiles
+      - ./apps:/app/apps
     depends_on:
       - backend
       - frontend
