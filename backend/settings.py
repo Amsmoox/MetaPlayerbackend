@@ -35,6 +35,7 @@ ALLOWED_HOSTS = [
     '10.0.2.2',  # Android emulator
     '192.168.11.101',  # Your local network IP
     '0.0.0.0',  # Allow binding to all interfaces
+    '38.242.149.21',
 ]
 
 
@@ -66,6 +67,8 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',  # Vite dev server
     'http://127.0.0.1:5173',  # Vite dev server (alternative)
+    'http://38.242.149.21',  # Production endpoint
+    'https://38.242.149.21',  # Production endpoint (HTTPS)
 ]
 
 # Allow credentials (cookies, authorization headers)
@@ -80,6 +83,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:5173',  # Frontend dev server (alternative)
     'http://10.0.2.2:8000',  # Android emulator
     'http://192.168.11.101:8000',  # Your local network IP
+    'http://38.242.149.21:8000',  # Your local network IP
+    "http://38.242.149.21",
 ]
 
 # CSRF cookie settings (for API compatibility)
